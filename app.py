@@ -154,20 +154,20 @@ hr {
 .col-now { color: #4A90E2; }
 
 .col-text-then {
-    font-size: 1.05rem;
+    font-size: 1rem;
     color: #888888;
     line-height: 1.6;
 }
 
 .col-text-now {
-    font-size: 1.05rem;
+    font-size: 1rem;
     color: #E8E8E8;
     font-weight: 500;
     line-height: 1.6;
 }
 
 .significance {
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     color: #888888;
     font-style: normal;
 }
