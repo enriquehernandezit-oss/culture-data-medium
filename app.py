@@ -1,5 +1,28 @@
 import streamlit as st
 from agent import run_culture_delta
+import datetime
+import json
+import os
+
+DAILY_LIMIT = 15
+
+def get_usage():
+    usage_file = "usage.json"
+    today = str(datetime.date.today())
+    if os.path.exists(usage_file):
+        with open(usage_file, "r") as f:
+            data = json.load(f)
+        if data.get("date") == today:
+            return data.get("count", 0)
+    return 0
+
+def increment_usage():
+    usage_file = "usage.json"
+    today = str(datetime.date.today())
+    count = get_usage() + 1
+    with open(usage_file, "w") as f:
+        json.dump({"date": today, "count": count}, f)
+    return count
 
 st.set_page_config(
     page_title="CultureDelta",
@@ -418,6 +441,10 @@ if run_button:
     if year_from == year_to:
         st.warning("Please enter two different years.")
         st.stop()
+    current_usage = get_usage()
+    if current_usage >= DAILY_LIMIT:
+        st.error("Daily limit of " + str(DAILY_LIMIT) + " analyses reached. Come back tomorrow.")
+        st.stop()
 
     try:
         if int(year_from) < 2006:
@@ -499,6 +526,7 @@ if run_button:
         topic, year_from, year_to,
         progress_callback=render_steps
     )
+    increment_usage()
     progress_placeholder.empty()
 
     if "error" in result:
