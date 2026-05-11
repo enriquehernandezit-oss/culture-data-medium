@@ -4,7 +4,9 @@
 
 ## Demo
 
-https://github.com/user-attachments/assets/877f2a26-6a6a-42b8-b204-2c73e185bc60
+
+https://github.com/user-attachments/assets/51979b80-bcc4-4bec-9977-ff61db15d1ff
+
 
 > Map how markets and culture shift over time.
 
