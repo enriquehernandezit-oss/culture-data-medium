@@ -9,11 +9,19 @@ from tools import search_web_period, search_reddit_period, get_trend_context
 load_dotenv()
 
 import os
-try:
-    import streamlit as st
-    ANTHROPIC_API_KEY = st.secrets["ANTHROPIC_API_KEY"]
-except Exception:
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+import json
+import time
+import anthropic
+from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+from tools import search_web_period, search_reddit_period, get_trend_context
+
+load_dotenv()
+
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+if not ANTHROPIC_API_KEY:
+    raise ValueError("Missing ANTHROPIC_API_KEY. Add it to your .env file.")
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 MODEL = "claude-haiku-4-5-20251001"
@@ -142,7 +150,11 @@ NOW ({year_to}):
 
 Analyze the cultural delta — what fundamentally changed between these periods.
 
-Return ONLY a JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure.
+Do not include markdown.
+Do not include comments.
+Make sure every list item is inside the correct array.
+
 {{
   "topic": "{topic}",
   "period_from": "{year_from}",
@@ -151,15 +163,21 @@ Return ONLY a JSON object with this exact structure:
     {{
       "then": "language/phrase used before",
       "now": "language/phrase used now",
-"significance": "a specific, concrete explanation of what this linguistic shift reveals about the underlying cultural change — minimum 2 sentences"  ],
+      "significance": "a specific, concrete explanation of what this linguistic shift reveals about the underlying cultural change — minimum 2 sentences"
+    }}
+  ],
   "value_shifts": [
     {{
       "shift": "description of value or attitude that changed",
       "evidence": "specific evidence from the research"
     }}
   ],
-  "new_behaviors": ["behavior that emerged in the now period"],
-  "faded_behaviors": ["behavior that was common then but faded now"],
+  "new_behaviors": [
+    "behavior that emerged in the now period"
+  ],
+  "faded_behaviors": [
+    "behavior that was common then but faded now"
+  ],
   "forward_signal": "based on this trajectory, where is this market heading in the next 2 years",
   "opportunity": "the specific business or cultural opportunity this delta reveals"
 }}"""
@@ -171,18 +189,56 @@ Return ONLY a JSON object with this exact structure:
     )
 
     raw = response.content[0].text.strip()
+
     if "```json" in raw:
         raw = raw.split("```json")[1].split("```")[0].strip()
     elif "```" in raw:
         raw = raw.split("```")[1].split("```")[0].strip()
+
     start = raw.find("{")
     end = raw.rfind("}") + 1
     if start != -1 and end > start:
         raw = raw[start:end]
+
     try:
         return json.loads(raw)
+
     except json.JSONDecodeError:
-        return {"error": "Failed to parse synthesis", "raw": raw}
+        repair_prompt = f"""
+The following text is supposed to be valid JSON, but it has formatting errors.
+
+Repair it into valid JSON only.
+Do not add explanations.
+Do not wrap it in markdown.
+Do not change the meaning.
+Return only the corrected JSON object.
+
+Broken JSON:
+{raw}
+"""
+
+        repair_response = client.messages.create(
+            model=MODEL,
+            max_tokens=3000,
+            messages=[{"role": "user", "content": repair_prompt}]
+        )
+
+        repaired = repair_response.content[0].text.strip()
+
+        if "```json" in repaired:
+            repaired = repaired.split("```json")[1].split("```")[0].strip()
+        elif "```" in repaired:
+            repaired = repaired.split("```")[1].split("```")[0].strip()
+
+        start = repaired.find("{")
+        end = repaired.rfind("}") + 1
+        if start != -1 and end > start:
+            repaired = repaired[start:end]
+
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            return {"error": "Failed to parse synthesis", "raw": raw}
 
 
 def run_culture_delta(topic: str, year_from: str, year_to: str,
